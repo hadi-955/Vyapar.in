@@ -7,7 +7,7 @@ def get_data():
     date = datetime.datetime.now()
     currentdt = date.strftime("%Y-%m-%d %H:%M:%S")
     data = {
-        "license_code": "Hasnain Ali",
+        "license_code": "C0DE_Li0N",
         "expiry_date": "2999-12-31 23:59:59",
         "plan": "Pos",
         "planId": 166,
