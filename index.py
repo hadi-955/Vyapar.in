@@ -11,7 +11,7 @@ app = Flask(__name__)
 def get_license_data():
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return {
-        "license_code": "Hasnain Ali",
+        "license_code": "C0DE_Li0N",
         "expiry_date": "2999-12-31 23:59:59",
         "plan": "Pos",
         "planId": 166,
@@ -87,3 +87,4 @@ def handle_500(e):
 # ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
