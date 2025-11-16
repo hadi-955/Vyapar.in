@@ -1,13 +1,13 @@
 import json
 import datetime
 import requests
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, Response
 
 app = Flask(__name__)
 
-# ───────────────────────────────────────────────────────────────
-# ⏱️ Get Current License Data
-# ───────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# License Function
+# ───────────────────────────────────────────────
 def get_license_data():
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return {
@@ -25,66 +25,72 @@ def get_license_data():
         "pairExpiryDate": "2999-12-31 23:59:59"
     }
 
-# ───────────────────────────────────────────────────────────────
-# 📤 Add Custom Response Headers
-# ───────────────────────────────────────────────────────────────
-def add_headers(response):i
-    response.headers['Content-Type'] = 'application/json'
+# ───────────────────────────────────────────────
+# Add headers
+# ───────────────────────────────────────────────
+def add_headers(response):
     response.headers['Server'] = 'Pro_Max_Futuristics'
     response.headers['Custom-Header'] = 'Pro_Max'
     return response
 
-# ───────────────────────────────────────────────────────────────
-# 🎯 License API (old and new)
-# ───────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────
+# License Routes
+# ───────────────────────────────────────────────
 @app.route('/api/license/<device_id>', methods=['GET', 'POST'])
 @app.route('/api/ns/license/<device_id>', methods=['GET', 'POST'])
 def license_api(device_id):
-    response = make_response(jsonify(get_license_data()))
-    return add_headers(response)
+    return add_headers(make_response(jsonify(get_license_data())))
 
-# ───────────────────────────────────────────────────────────────
-# 🌐 Proxy to vyaparapp.in
-# ───────────────────────────────────────────────────────────────
-@app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
-@app.route('/<path:path>', methods=['GET', 'POST'])
-def proxy_handler(path):
-    url = f'https://vyaparapp.in/{path}'
+# ───────────────────────────────────────────────
+# Allow FULL Sync Support
+# ───────────────────────────────────────────────
+@app.route('/sync/<path:path>', methods=['GET', 'POST'])
+def sync_proxy(path):
+
+    url = f"https://vyaparapp.in/sync/{path}"
 
     try:
-        if request.method == 'POST':
-            proxied = requests.post(url, data=request.form, timeout=10)
+        if request.method == "POST":
+            proxied = requests.post(url, data=request.data, headers=request.headers, timeout=20)
         else:
-            proxied = requests.get(url, timeout=10)
+            proxied = requests.get(url, headers=request.headers, timeout=20)
+
     except requests.exceptions.RequestException as e:
-        return add_headers(make_response(jsonify(error="Proxy Request Failed", detail=str(e)), 502))
+        return jsonify({"error": "Sync proxy failed", "detail": str(e)}), 502
 
-    content_type = proxied.headers.get('Content-Type', '')
+    return Response(
+        proxied.content,
+        status=proxied.status_code,
+        content_type=proxied.headers.get("Content-Type")
+    )
 
-    # Only allow JSON responses
-    if 'application/json' in content_type:
-        try:
-            data = proxied.json()
-        except ValueError:
-            return add_headers(make_response(jsonify(error="Malformed JSON from origin server"), 502))
-        return add_headers(make_response(jsonify(data)))
-    else:
-        return add_headers(make_response(jsonify(error="Upstream server did not return JSON"), 502))
+# ───────────────────────────────────────────────
+# Full Proxy (fallback)
+# ───────────────────────────────────────────────
+@app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
+@app.route('/<path:path>', methods=['GET', 'POST'])
+def full_proxy(path):
 
-# ───────────────────────────────────────────────────────────────
-# ❌ Custom Error Handlers
-# ───────────────────────────────────────────────────────────────
-@app.errorhandler(404)
-def handle_404(e):
-    return add_headers(make_response(jsonify(error="Not Found"), 404))
+    url = f"https://vyaparapp.in/{path}"
 
-@app.errorhandler(500)
-def handle_500(e):
-    return add_headers(make_response(jsonify(error="Internal Server Error"), 500))
+    try:
+        if request.method == "POST":
+            proxied = requests.post(url, data=request.data, headers=request.headers, timeout=20)
+        else:
+            proxied = requests.get(url, headers=request.headers, timeout=20)
 
-# ───────────────────────────────────────────────────────────────
-# ▶️ Entry Point
-# ───────────────────────────────────────────────────────────────
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    except Exception as e:
+        return jsonify({"error": "Proxy failed", "detail": str(e)}), 500
 
+    return Response(
+        proxied.content,
+        status=proxied.status_code,
+        content_type=proxied.headers.get("Content-Type")
+    )
+
+
+# ───────────────────────────────────────────────
+# Run
+# ───────────────────────────────────────────────
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
